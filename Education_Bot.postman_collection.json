@@ -1,0 +1,482 @@
+{
+  "info": {
+    "name": "Education Bot API",
+    "description": "Collection untuk testing Education Bot dengan session management dan conversation history",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Get API Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": ["{{base_url}}"],
+          "path": [""]
+        },
+        "description": "Mendapatkan informasi API dan list endpoint yang tersedia"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has endpoints info\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('endpoints');",
+              "    pm.expect(jsonData).to.have.property('activeSessions');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Create New Session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/session/new",
+          "host": ["{{base_url}}"],
+          "path": ["session", "new"]
+        },
+        "description": "Membuat session baru untuk conversation. SessionId akan disimpan otomatis ke environment variable."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has sessionId\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('sessionId');",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    ",
+              "    // Save sessionId to collection variable",
+              "    pm.collectionVariables.set('session_id', jsonData.sessionId);",
+              "});",
+              "",
+              "pm.test(\"SessionId is valid UUID\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;",
+              "    pm.expect(jsonData.sessionId).to.match(uuidRegex);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Chat - Pertanyaan Matematika",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"message\": \"Saya tidak mengerti bagaimana cara menyelesaikan persamaan kuadrat x² + 5x + 6 = 0. Bisa bantu?\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/chat",
+          "host": ["{{base_url}}"],
+          "path": ["chat"]
+        },
+        "description": "Test chat dengan pertanyaan matematika. Bot seharusnya bertanya balik atau memberikan hints, bukan langsung jawaban."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has message\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('message');",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.message).to.not.be.empty;",
+              "});",
+              "",
+              "pm.test(\"Message count incremented\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.messageCount).to.be.at.least(1);",
+              "});",
+              "",
+              "pm.test(\"Response time is acceptable\", function () {",
+              "    pm.expect(pm.response.responseTime).to.be.below(10000);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Chat - Follow Up",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"message\": \"Saya sudah coba faktorisasi tapi masih bingung. Bisa kasih contoh step by step?\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/chat",
+          "host": ["{{base_url}}"],
+          "path": ["chat"]
+        },
+        "description": "Test conversation history - bot harus ingat percakapan sebelumnya tentang persamaan kuadrat"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Bot remembers context\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.message).to.not.be.empty;",
+              "});",
+              "",
+              "pm.test(\"Message count increased\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.messageCount).to.be.at.least(2);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Chat - Topik Baru",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"message\": \"Sekarang saya mau belajar tentang fotosintesis. Bisa jelaskan dengan cara yang mudah dipahami?\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/chat",
+          "host": ["{{base_url}}"],
+          "path": ["chat"]
+        },
+        "description": "Test pergantian topik dalam session yang sama"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Bot handles new topic\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.message).to.not.be.empty;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Chat with Image",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "sessionId",
+              "value": "{{session_id}}",
+              "type": "text"
+            },
+            {
+              "key": "image",
+              "type": "file",
+              "src": "",
+              "description": "Upload foto soal/diagram/grafik"
+            },
+            {
+              "key": "question",
+              "value": "Tolong jelaskan cara menyelesaikan soal dalam gambar ini step by step",
+              "type": "text",
+              "description": "Optional - pertanyaan tentang gambar"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/chat/image",
+          "host": ["{{base_url}}"],
+          "path": ["chat", "image"]
+        },
+        "description": "Upload gambar soal/diagram untuk dianalisis. Bot akan membantu memahami gambar dan memberikan guidance."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Image analyzed successfully\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "    pm.expect(jsonData.imageAnalyzed).to.be.true;",
+              "    pm.expect(jsonData.message).to.not.be.empty;",
+              "});",
+              "",
+              "pm.test(\"Response time acceptable for image\", function () {",
+              "    pm.expect(pm.response.responseTime).to.be.below(20000);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Get Session History",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/session/{{session_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["session", "{{session_id}}"]
+        },
+        "description": "Melihat seluruh riwayat percakapan dalam session"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Has conversation history\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('history');",
+              "    pm.expect(jsonData.history).to.be.an('array');",
+              "    pm.expect(jsonData.totalMessages).to.be.at.least(1);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Get Session Stats",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/session/{{session_id}}/stats",
+          "host": ["{{base_url}}"],
+          "path": ["session", "{{session_id}}", "stats"]
+        },
+        "description": "Melihat statistik session (total pesan, durasi, dll)"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Has session stats\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.stats).to.have.property('totalMessages');",
+              "    pm.expect(jsonData.stats).to.have.property('durationMinutes');",
+              "    pm.expect(jsonData.stats.isActive).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. List All Sessions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/sessions",
+          "host": ["{{base_url}}"],
+          "path": ["sessions"]
+        },
+        "description": "List semua session yang aktif (untuk monitoring/admin)"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Has sessions list\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('sessions');",
+              "    pm.expect(jsonData.sessions).to.be.an('array');",
+              "    pm.expect(jsonData.totalSessions).to.be.at.least(1);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Delete Session",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/session/{{session_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["session", "{{session_id}}"]
+        },
+        "description": "Menghapus session (cleanup)"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Session deleted\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Error - Chat Without Session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Test tanpa sessionId\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/chat",
+          "host": ["{{base_url}}"],
+          "path": ["chat"]
+        },
+        "description": "Test error handling - chat tanpa sessionId"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 400\", function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test(\"Error message provided\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.be.false;",
+              "    pm.expect(jsonData).to.have.property('error');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}
