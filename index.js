@@ -1,45 +1,65 @@
 import 'dotenv/config';
 import express from 'express';
-import multer from 'multer';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { GoogleGenAI } from '@google/genai';
 import crypto from 'crypto';
 
-const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+const app = express();
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const PORT = 3000;
 
 // Storage untuk conversation history per session
 const sessions = new Map();
 
 // System instruction untuk education bot
-const SYSTEM_INSTRUCTION = `Kamu adalah Education Bot, asisten pembelajaran yang ramah dan sabar.
+const SYSTEM_INSTRUCTION = `Kamu adalah Education Bot, asisten pembelajaran yang ramah dan sabar untuk semua mata pelajaran.
 
 Peranmu:
-- Membantu siswa memahami konsep, bukan hanya memberikan jawaban langsung
+- Membantu siswa memahami konsep di berbagai mata pelajaran (Matematika, Sains, Bahasa Inggris, IPA, IPS, dll)
 - Menggunakan metode Socratic (bertanya balik) untuk merangsang pemikiran kritis
 - Memberikan penjelasan step-by-step yang mudah dipahami
 - Menyesuaikan bahasa dengan tingkat pemahaman siswa
 - Mendorong siswa untuk berpikir sendiri dengan hints dan clues
-- Bersikap positif dan memotivasi siswa
+- Bersikap positif dan memotivasi siswa dalam belajar
 
 Gaya mengajar:
 - Gunakan bahasa Indonesia yang santai namun edukatif
-- Berikan analogi atau contoh kehidupan sehari-hari
+- Berikan analogi atau contoh kehidupan sehari-hari untuk mempermudah pemahaman
 - Jika siswa bertanya soal, tanyakan dulu "Apa yang sudah kamu coba?" atau "Bagian mana yang membingungkan?"
-- Pecah masalah kompleks menjadi langkah-langkah kecil
+- Pecah masalah kompleks menjadi langkah-langkah kecil yang mudah diikuti
 - Berikan emoji untuk membuat pembelajaran lebih menyenangkan 📚✨
+- Puji usaha dan progress siswa untuk meningkatkan motivasi
+
+Mata pelajaran yang bisa dibantu:
+- Matematika (Aljabar, Geometri, Kalkulus, Statistika, dll)
+- Sains (Fisika, Kimia, Biologi)
+- Bahasa Inggris (Grammar, Vocabulary, Reading Comprehension, Writing)
+- Bahasa Indonesia
+- Ilmu Pengetahuan Alam (IPA)
+- Ilmu Pengetahuan Sosial (IPS)
+- Dan mata pelajaran lainnya
 
 Jangan:
 - Langsung memberikan jawaban lengkap tanpa proses pembelajaran
-- Menggunakan bahasa yang terlalu teknis atau rumit
+- Menggunakan bahasa yang terlalu teknis atau rumit tanpa penjelasan
 - Membuat siswa merasa bodoh atau gagal
-- Menolak pertanyaan di luar akademik, tapi arahkan kembali ke pembelajaran`;
+- Menolak pertanyaan di luar akademik, tapi arahkan kembali ke pembelajaran dengan lembut
+
+Selalu tanyakan di akhir apakah siswa sudah paham atau butuh penjelasan lebih lanjut.`;
 
 // Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 // CORS untuk development
 app.use((req, res, next) => {
@@ -59,23 +79,8 @@ function generateSessionId() {
 // Get or create session
 function getSession(sessionId) {
   if (!sessions.has(sessionId)) {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
-      systemInstruction: SYSTEM_INSTRUCTION,
-    });
-    
-    const chat = model.startChat({
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 40,
-        maxOutputTokens: 2048,
-      },
-      history: [],
-    });
-    
     sessions.set(sessionId, {
-      chat,
+      history: [],
       createdAt: new Date(),
       lastActivity: new Date(),
       messageCount: 0,
@@ -113,8 +118,7 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       'POST /session/new': 'Buat session baru',
-      'POST /chat': 'Kirim pesan (body: sessionId, message)',
-      'POST /chat/image': 'Analisis gambar/soal (multipart: sessionId, image, question)',
+      'POST /api/chat': 'Kirim pesan (body: sessionId, message) atau conversation array',
       'GET /session/:sessionId': 'Lihat riwayat chat',
       'GET /session/:sessionId/stats': 'Statistik session',
       'DELETE /session/:sessionId': 'Hapus session',
@@ -137,106 +141,93 @@ app.post('/session/new', (req, res) => {
   });
 });
 
-// Chat endpoint
-app.post('/chat', async (req, res) => {
-  const { sessionId, message } = req.body;
-  
-  // Validasi input
-  if (!sessionId) {
-    return res.status(400).json({
-      success: false,
-      error: 'sessionId diperlukan. Buat session baru di POST /session/new',
-    });
-  }
-  
-  if (!message || message.trim() === '') {
-    return res.status(400).json({
-      success: false,
-      error: 'message tidak boleh kosong',
-    });
-  }
-  
-  try {
-    const session = getSession(sessionId);
-    const result = await session.chat.sendMessage(message);
-    const response = result.response.text();
+// Chat endpoint (support both old format with conversation array and new format with sessionId)
+app.post('/api/chat', async (req, res) => {
+    const { conversation, sessionId, message } = req.body;
     
-    session.messageCount++;
-    
-    res.json({
-      success: true,
-      sessionId,
-      message: response,
-      messageCount: session.messageCount,
-    });
-    
-  } catch (error) {
-    console.error('Error in chat:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Gagal memproses pesan',
-      details: error.message,
-    });
-  }
-});
+    try {
+        // Format baru dengan session management
+        if (sessionId && message) {
+            if (!message || message.trim() === '') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'message tidak boleh kosong',
+                });
+            }
+            
+            const session = getSession(sessionId);
+            
+            // Tambahkan pesan user ke history
+            session.history.push({
+                role: 'user',
+                parts: [{ text: message }]
+            });
+            
+            // Buat contents dengan system instruction
+            const contents = [
+                ...session.history
+            ];
+            
+            const response = await ai.models.generateContent({
+                model: GEMINI_MODEL,
+                contents,
+                config: {
+                    temperature: 0.7,
+                    systemInstruction: SYSTEM_INSTRUCTION,
+                }
+            });
+            
+            const responseText = response.text;
+            
+            // Tambahkan response ke history
+            session.history.push({
+                role: 'model',
+                parts: [{ text: responseText }]
+            });
+            
+            session.messageCount++;
+            
+            return res.status(200).json({
+                success: true,
+                sessionId,
+                result: responseText,
+                messageCount: session.messageCount,
+            });
+        }
+        
+        // Format lama dengan conversation array (backward compatibility)
+        if (conversation) {
+            if (!Array.isArray(conversation)) throw new Error('Messages must be an array');
 
-// Chat dengan gambar (untuk soal foto, diagram, dll)
-app.post('/chat/image', upload.single('image'), async (req, res) => {
-  const { sessionId, question } = req.body;
-  
-  // Validasi input
-  if (!sessionId) {
-    return res.status(400).json({
-      success: false,
-      error: 'sessionId diperlukan',
-    });
-  }
-  
-  if (!req.file) {
-    return res.status(400).json({
-      success: false,
-      error: 'image file diperlukan',
-    });
-  }
-  
-  try {
-    const session = getSession(sessionId);
-    
-    // Convert image buffer to base64
-    const imageBase64 = req.file.buffer.toString('base64');
-    const imagePart = {
-      inlineData: {
-        data: imageBase64,
-        mimeType: req.file.mimetype,
-      },
-    };
-    
-    // Buat prompt dengan atau tanpa pertanyaan tambahan
-    const prompt = question 
-      ? `${question}\n\n[Gambar dilampirkan di atas]`
-      : 'Tolong bantu saya memahami gambar ini. Apa yang perlu dijelaskan?';
-    
-    const result = await session.chat.sendMessage([imagePart, prompt]);
-    const response = result.response.text();
-    
-    session.messageCount++;
-    
-    res.json({
-      success: true,
-      sessionId,
-      message: response,
-      messageCount: session.messageCount,
-      imageAnalyzed: true,
-    });
-    
-  } catch (error) {
-    console.error('Error in image chat:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Gagal menganalisis gambar',
-      details: error.message,
-    });
-  }
+            const contents = conversation.map(({ role, text }) => ({
+                role,
+                parts: [{ text }]
+            }));
+
+            const response = await ai.models.generateContent({
+                model: GEMINI_MODEL,
+                contents,
+                config: {
+                    temperature: 0.7,
+                    systemInstruction: SYSTEM_INSTRUCTION,
+                }
+            });
+            
+            return res.status(200).json({ result: response.text });
+        }
+        
+        // Jika tidak ada format yang cocok
+        return res.status(400).json({
+            success: false,
+            error: 'Kirim dengan format: { sessionId, message } atau { conversation: [...] }',
+        });
+        
+    } catch (e) {
+        res.status(500).json({ 
+            success: false,
+            error: e.message 
+        });
+    }
 });
 
 // Get chat history
@@ -251,14 +242,12 @@ app.get('/session/:sessionId', (req, res) => {
   }
   
   const session = sessions.get(sessionId);
-  const history = session.chat._history || [];
   
   // Format history untuk response
-  const formattedHistory = history.map((item, index) => ({
+  const formattedHistory = session.history.map((item, index) => ({
     id: index + 1,
     role: item.role,
     text: item.parts[0]?.text || '[Media content]',
-    timestamp: null, // Gemini tidak menyimpan timestamp per message
   }));
   
   res.json({
@@ -343,8 +332,7 @@ app.use((req, res) => {
     error: 'Endpoint tidak ditemukan',
     availableEndpoints: {
       'POST /session/new': 'Buat session baru',
-      'POST /chat': 'Kirim pesan',
-      'POST /chat/image': 'Analisis gambar',
+      'POST /api/chat': 'Kirim pesan',
       'GET /session/:sessionId': 'Lihat riwayat',
       'DELETE /session/:sessionId': 'Hapus session',
     },
@@ -364,9 +352,9 @@ app.use((err, req, res, next) => {
 // ==================== START SERVER ====================
 
 app.listen(PORT, () => {
-  console.log(`🎓 Education Bot API running on http://localhost:${PORT}`);
-  console.log(`📚 Ready to help students learn!`);
+  console.log(`📚 Education Bot API running on http://localhost:${PORT}`);
+  console.log(`✨ Ready to help students learn all subjects!`);
   console.log(`\n💡 Quick start:`);
   console.log(`   1. POST http://localhost:${PORT}/session/new`);
-  console.log(`   2. POST http://localhost:${PORT}/chat dengan body: { sessionId, message }`);
+  console.log(`   2. POST http://localhost:${PORT}/api/chat dengan body: { sessionId, message }`);
 });

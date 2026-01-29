@@ -42,7 +42,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 ### 3. Run Server
 ```bash
-node education-bot.js
+node index.js
 ```
 
 Server akan jalan di `http://localhost:3000`

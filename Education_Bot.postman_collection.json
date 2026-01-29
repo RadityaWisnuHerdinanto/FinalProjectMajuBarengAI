@@ -116,9 +116,9 @@
           "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"message\": \"Saya tidak mengerti bagaimana cara menyelesaikan persamaan kuadrat x² + 5x + 6 = 0. Bisa bantu?\"\n}"
         },
         "url": {
-          "raw": "{{base_url}}/chat",
+          "raw": "{{base_url}}/api/chat",
           "host": ["{{base_url}}"],
-          "path": ["chat"]
+          "path": ["api", "chat"]
         },
         "description": "Test chat dengan pertanyaan matematika. Bot seharusnya bertanya balik atau memberikan hints, bukan langsung jawaban."
       },
@@ -168,9 +168,9 @@
           "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"message\": \"Saya sudah coba faktorisasi tapi masih bingung. Bisa kasih contoh step by step?\"\n}"
         },
         "url": {
-          "raw": "{{base_url}}/chat",
+          "raw": "{{base_url}}/api/chat",
           "host": ["{{base_url}}"],
-          "path": ["chat"]
+          "path": ["api", "chat"]
         },
         "description": "Test conversation history - bot harus ingat percakapan sebelumnya tentang persamaan kuadrat"
       },
@@ -215,9 +215,9 @@
           "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"message\": \"Sekarang saya mau belajar tentang fotosintesis. Bisa jelaskan dengan cara yang mudah dipahami?\"\n}"
         },
         "url": {
-          "raw": "{{base_url}}/chat",
+          "raw": "{{base_url}}/api/chat",
           "host": ["{{base_url}}"],
-          "path": ["chat"]
+          "path": ["api", "chat"]
         },
         "description": "Test pergantian topik dalam session yang sama"
       },
@@ -243,67 +243,7 @@
       ]
     },
     {
-      "name": "5. Chat with Image",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "sessionId",
-              "value": "{{session_id}}",
-              "type": "text"
-            },
-            {
-              "key": "image",
-              "type": "file",
-              "src": "",
-              "description": "Upload foto soal/diagram/grafik"
-            },
-            {
-              "key": "question",
-              "value": "Tolong jelaskan cara menyelesaikan soal dalam gambar ini step by step",
-              "type": "text",
-              "description": "Optional - pertanyaan tentang gambar"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{base_url}}/chat/image",
-          "host": ["{{base_url}}"],
-          "path": ["chat", "image"]
-        },
-        "description": "Upload gambar soal/diagram untuk dianalisis. Bot akan membantu memahami gambar dan memberikan guidance."
-      },
-      "response": [],
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test(\"Status code is 200\", function () {",
-              "    pm.response.to.have.status(200);",
-              "});",
-              "",
-              "pm.test(\"Image analyzed successfully\", function () {",
-              "    var jsonData = pm.response.json();",
-              "    pm.expect(jsonData.success).to.be.true;",
-              "    pm.expect(jsonData.imageAnalyzed).to.be.true;",
-              "    pm.expect(jsonData.message).to.not.be.empty;",
-              "});",
-              "",
-              "pm.test(\"Response time acceptable for image\", function () {",
-              "    pm.expect(pm.response.responseTime).to.be.below(20000);",
-              "});"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ]
-    },
-    {
-      "name": "6. Get Session History",
+      "name": "5. Get Session History",
       "request": {
         "method": "GET",
         "header": [],
@@ -337,7 +277,7 @@
       ]
     },
     {
-      "name": "7. Get Session Stats",
+      "name": "6. Get Session Stats",
       "request": {
         "method": "GET",
         "header": [],
@@ -371,7 +311,7 @@
       ]
     },
     {
-      "name": "8. List All Sessions",
+      "name": "7. List All Sessions",
       "request": {
         "method": "GET",
         "header": [],
@@ -405,7 +345,7 @@
       ]
     },
     {
-      "name": "9. Delete Session",
+      "name": "8. Delete Session",
       "request": {
         "method": "DELETE",
         "header": [],
@@ -437,7 +377,7 @@
       ]
     },
     {
-      "name": "10. Error - Chat Without Session",
+      "name": "9. Error - Chat Without Session",
       "request": {
         "method": "POST",
         "header": [
@@ -451,9 +391,9 @@
           "raw": "{\n  \"message\": \"Test tanpa sessionId\"\n}"
         },
         "url": {
-          "raw": "{{base_url}}/chat",
+          "raw": "{{base_url}}/api/chat",
           "host": ["{{base_url}}"],
-          "path": ["chat"]
+          "path": ["api", "chat"]
         },
         "description": "Test error handling - chat tanpa sessionId"
       },

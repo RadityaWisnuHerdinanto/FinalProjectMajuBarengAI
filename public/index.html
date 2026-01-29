@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tidars - Asisten Belajar AI</title>
+  <link rel="stylesheet" href="style.css"/>
+  <!-- Toastify CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <!-- SweetAlert2 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+</head>
+<body>
+  <!-- Sidebar Kiri untuk Sessions -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>💬 Chat Sessions</h2>
+      <button id="btn-new-session" class="sidebar-btn" title="Session Baru">+ Baru</button>
+    </div>
+    
+    <div class="sessions-list" id="sessions-list">
+      <div class="loading">Memuat sessions...</div>
+    </div>
+    
+    <div class="sidebar-footer">
+      <button id="toggle-sidebar" class="sidebar-toggle">◀</button>
+    </div>
+  </div>
+
+  <!-- Main Chat Area -->
+  <div class="main-container">
+    <div class="container">
+      <div class="header">
+        <button id="toggle-sidebar-mobile" class="sidebar-toggle-mobile">☰</button>
+        <div class="header-title">
+          <h1>📚 Tidars</h1>
+          <p class="subtitle">Asisten pembelajaran AI untuk semua mata pelajaran</p>
+        </div>
+        <div class="header-actions">
+          <button id="btn-stats" class="icon-btn" title="Statistik Session">📊</button>
+          <button id="btn-history" class="icon-btn" title="Lihat History">📜</button>
+          <button id="btn-clear" class="icon-btn" title="Hapus Chat">🗑️</button>
+        </div>
+        <div id="status" class="status">Memulai...</div>
+      </div>
+      
+      <div id="chat-box" class="chat-box"></div>
+      
+      <div class="input-container">
+        <form id="chat-form">
+          <input 
+            type="text" 
+            id="user-input" 
+            placeholder="Tanya apa saja tentang Matematika, Sains, Bahasa Inggris, dll..." 
+            autocomplete="off" 
+            required 
+          />
+          <button type="submit">Kirim</button>
+        </form>
+        <div class="footer">
+          <small>Powered by Google Gemini AI ✨</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal untuk Stats -->
+  <div id="modal-stats" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📊 Statistik Session</h2>
+        <span class="close" data-modal="modal-stats">&times;</span>
+      </div>
+      <div class="modal-body" id="stats-content">
+        <div class="loading">Memuat...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal untuk History -->
+  <div id="modal-history" class="modal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h2>📜 Riwayat Percakapan</h2>
+        <span class="close" data-modal="modal-history">&times;</span>
+      </div>
+      <div class="modal-body" id="history-content">
+        <div class="loading">Memuat...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toastify JS -->
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <!-- SweetAlert2 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <script src="script.js"></script>
+</body>
+</html>
