@@ -8,7 +8,15 @@ const sidebar = document.getElementById('sidebar');
 const sessionsList = document.getElementById('sessions-list');
 const toggleSidebar = document.getElementById('toggle-sidebar');
 const toggleSidebarMobile = document.getElementById('toggle-sidebar-mobile');
+const sidebarOpenBtn = document.getElementById('sidebar-open-btn');
 const mainContainer = document.querySelector('.main-container');
+
+// Image upload elements
+const imageInput = document.getElementById('image-input');
+const uploadBtn = document.getElementById('upload-btn');
+const imagePreviewContainer = document.getElementById('image-preview-container');
+const imagePreview = document.getElementById('image-preview');
+const removeImageBtn = document.getElementById('remove-image');
 
 // Buttons
 const btnStats = document.getElementById('btn-stats');
@@ -20,9 +28,16 @@ const btnClear = document.getElementById('btn-clear');
 const modalStats = document.getElementById('modal-stats');
 const modalHistory = document.getElementById('modal-history');
 
+// Image lightbox elements
+const imageLightbox = document.getElementById('image-lightbox');
+const lightboxImage = document.getElementById('lightbox-image');
+const lightboxClose = document.querySelector('.lightbox-close');
+
 let sessionId = null;
 let isLoading = false;
 let allSessions = [];
+let selectedImage = null; // Store selected image file
+let selectedImageBase64 = null; // Store base64 for display in chat
 
 // API Base URL
 const API_BASE = 'http://localhost:3000';
@@ -94,12 +109,14 @@ async function showConfirm(title, text, confirmText = 'Ya', cancelText = 'Batal'
 function toggleSidebarFunction() {
   sidebar.classList.toggle('collapsed');
   mainContainer.classList.toggle('sidebar-collapsed');
+  sidebarOpenBtn.classList.toggle('visible');
 }
 
 toggleSidebar.addEventListener('click', toggleSidebarFunction);
 toggleSidebarMobile.addEventListener('click', () => {
   sidebar.classList.toggle('show');
 });
+sidebarOpenBtn.addEventListener('click', toggleSidebarFunction);
 
 // Load all sessions
 async function loadSessions() {
@@ -298,6 +315,97 @@ async function sendMessage(message) {
   }
 }
 
+// Send message with image to API (NEW!)
+async function sendMessageWithImage(message, imageFile) {
+  if (!sessionId) {
+    appendMessage('bot', 'Mohon tunggu, session sedang diinisialisasi...');
+    await initializeSession();
+    if (!sessionId) return;
+  }
+
+  isLoading = true;
+  statusText.textContent = 'Bot sedang menganalisis gambar...';
+
+  try {
+    const formData = new FormData();
+    formData.append('sessionId', sessionId);
+    formData.append('message', message);
+    formData.append('image', imageFile);
+
+    const response = await fetch(`${API_BASE}/api/chat-with-image`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (data.success && data.result) {
+      appendMessage('bot', data.result);
+      statusText.textContent = `Siap membantu belajar! (${data.messageCount} pesan) 📚`;
+      showSuccess('Gambar berhasil dianalisis! 📸');
+    } else {
+      appendMessage('bot', `Error: ${data.error || 'Terjadi kesalahan'}`);
+      statusText.textContent = 'Error';
+      showError('Gagal menganalisis gambar');
+    }
+  } catch (error) {
+    console.error('Error sending message with image:', error);
+    appendMessage('bot', 'Maaf, terjadi kesalahan saat mengirim gambar. Coba lagi ya!');
+    statusText.textContent = 'Error';
+    showError('Gagal mengirim gambar');
+  } finally {
+    isLoading = false;
+  }
+}
+
+
+// ==================== IMAGE UPLOAD HANDLERS ====================
+
+// Handle upload button click
+uploadBtn.addEventListener('click', () => {
+  imageInput.click();
+});
+
+// Handle image selection
+imageInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showError('Hanya file gambar yang diperbolehkan!');
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showError('Ukuran gambar maksimal 5MB!');
+      return;
+    }
+    
+    selectedImage = file;
+    
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      selectedImageBase64 = e.target.result; // Save for chat display
+      imagePreview.src = e.target.result;
+      imagePreviewContainer.style.display = 'block';
+      showInfo('Gambar dipilih! Tulis pertanyaan tentang gambar ini.');
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+// Handle remove image
+removeImageBtn.addEventListener('click', () => {
+  selectedImage = null;
+  selectedImageBase64 = null;
+  imagePreview.src = '';
+  imagePreviewContainer.style.display = 'none';
+  imageInput.value = '';
+  showInfo('Gambar dihapus');
+});
+
 // Handle form submission
 form.addEventListener('submit', async function (e) {
   e.preventDefault();
@@ -305,27 +413,62 @@ form.addEventListener('submit', async function (e) {
   const userMessage = input.value.trim();
   if (!userMessage || isLoading) return;
 
-  appendMessage('user', userMessage);
-  input.value = '';
-  input.disabled = true;
-
-  await sendMessage(userMessage);
+  // Check if there's an image
+  if (selectedImage && selectedImageBase64) {
+    appendMessage('user', userMessage, selectedImageBase64); // Show text + image
+    input.value = '';
+    input.disabled = true;
+    await sendMessageWithImage(userMessage, selectedImage);
+    // Clear image after sending
+    selectedImage = null;
+    selectedImageBase64 = null;
+    imagePreview.src = '';
+    imagePreviewContainer.style.display = 'none';
+    imageInput.value = '';
+  } else {
+    appendMessage('user', userMessage); // Show text only
+    input.value = '';
+    input.disabled = true;
+    await sendMessage(userMessage);
+  }
   
   input.disabled = false;
   input.focus();
 });
 
 // Append message to chat box
-function appendMessage(sender, text) {
+function appendMessage(sender, text, imageDataUrl = null) {
   const msgWrapper = document.createElement('div');
   msgWrapper.classList.add('message-wrapper', sender);
 
   const msg = document.createElement('div');
   msg.classList.add('message', sender);
   
-  // Format markdown-like text
+  // If there's an image, add it first
+  if (imageDataUrl) {
+    const imgContainer = document.createElement('div');
+    imgContainer.classList.add('message-image-container');
+    
+    const img = document.createElement('img');
+    img.src = imageDataUrl;
+    img.classList.add('message-image');
+    img.alt = 'Uploaded image';
+    
+    // Add click handler to open lightbox
+    img.addEventListener('click', () => {
+      openImageLightbox(imageDataUrl);
+    });
+    
+    imgContainer.appendChild(img);
+    msg.appendChild(imgContainer);
+  }
+  
+  // Add text content
+  const textContent = document.createElement('div');
+  textContent.classList.add('message-text');
   const formattedText = formatMessage(text);
-  msg.innerHTML = formattedText;
+  textContent.innerHTML = formattedText;
+  msg.appendChild(textContent);
   
   msgWrapper.appendChild(msg);
   chatBox.appendChild(msgWrapper);
@@ -507,6 +650,41 @@ document.querySelectorAll('.close').forEach(btn => {
 window.addEventListener('click', (e) => {
   if (e.target.classList.contains('modal')) {
     closeModal(e.target);
+  }
+});
+
+// ==================== IMAGE LIGHTBOX ====================
+
+// Open image lightbox
+function openImageLightbox(imageUrl) {
+  lightboxImage.src = imageUrl;
+  imageLightbox.style.display = 'flex';
+}
+
+// Close image lightbox
+function closeImageLightbox() {
+  imageLightbox.style.display = 'none';
+  lightboxImage.src = '';
+}
+
+// Close lightbox on close button click
+if (lightboxClose) {
+  lightboxClose.addEventListener('click', closeImageLightbox);
+}
+
+// Close lightbox on background click
+if (imageLightbox) {
+  imageLightbox.addEventListener('click', (e) => {
+    if (e.target === imageLightbox) {
+      closeImageLightbox();
+    }
+  });
+}
+
+// Close lightbox on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && imageLightbox.style.display === 'flex') {
+    closeImageLightbox();
   }
 });
 

@@ -5,6 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import crypto from 'crypto';
+import multer from 'multer';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,10 +58,24 @@ Selalu tanyakan di akhir apakah siswa sudah paham atau butuh penjelasan lebih la
 
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Configure multer untuk upload gambar (memory storage)
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // Max 5MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/gif'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Hanya file gambar yang diperbolehkan!'));
+    }
+  }
+});
 
 // CORS untuk development
 app.use((req, res, next) => {
@@ -104,6 +120,16 @@ function cleanOldSessions() {
       console.log(`Session ${sessionId} cleaned up`);
     }
   }
+}
+
+// Convert image buffer to base64 untuk Gemini
+function imageToBase64(buffer, mimeType) {
+  return {
+    inlineData: {
+      data: buffer.toString('base64'),
+      mimeType: mimeType
+    }
+  };
 }
 
 // Jalankan cleanup setiap 15 menit
@@ -223,6 +249,77 @@ app.post('/api/chat', async (req, res) => {
         });
         
     } catch (e) {
+        res.status(500).json({ 
+            success: false,
+            error: e.message 
+        });
+    }
+});
+
+// Chat dengan gambar - ENDPOINT BARU!
+app.post('/api/chat-with-image', upload.single('image'), async (req, res) => {
+    try {
+        const { sessionId, message } = req.body;
+        const imageFile = req.file;
+        
+        if (!sessionId || !message) {
+            return res.status(400).json({
+                success: false,
+                error: 'sessionId dan message wajib diisi'
+            });
+        }
+        
+        if (!imageFile) {
+            return res.status(400).json({
+                success: false,
+                error: 'Gambar tidak ditemukan'
+            });
+        }
+        
+        const session = getSession(sessionId);
+        
+        // Konversi gambar ke format Gemini
+        const imageData = imageToBase64(imageFile.buffer, imageFile.mimetype);
+        
+        // Tambahkan pesan user dengan gambar ke history
+        session.history.push({
+            role: 'user',
+            parts: [
+                { text: message },
+                imageData
+            ]
+        });
+        
+        // Generate response dengan vision
+        const response = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: session.history,
+            config: {
+                temperature: 0.7,
+                systemInstruction: SYSTEM_INSTRUCTION,
+            }
+        });
+        
+        const responseText = response.text;
+        
+        // Tambahkan response ke history
+        session.history.push({
+            role: 'model',
+            parts: [{ text: responseText }]
+        });
+        
+        session.messageCount++;
+        
+        return res.status(200).json({
+            success: true,
+            sessionId,
+            result: responseText,
+            messageCount: session.messageCount,
+            hasImage: true
+        });
+        
+    } catch (e) {
+        console.error('Error chat with image:', e);
         res.status(500).json({ 
             success: false,
             error: e.message 

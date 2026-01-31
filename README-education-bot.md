@@ -1,6 +1,6 @@
-# 🎓 Education Bot API
+# 🎓 Tidars - Education Bot
 
-Education Bot yang menggunakan Gemini AI dengan conversation history dan session management untuk pembelajaran interaktif.
+**Tidars** adalah Education Bot yang menggunakan Gemini AI dengan conversation history dan session management untuk pembelajaran interaktif semua mata pelajaran (Matematika, Fisika, Kimia, Biologi, Bahasa Inggris, dll).
 
 ## ✨ Fitur Utama
 
@@ -8,6 +8,7 @@ Education Bot yang menggunakan Gemini AI dengan conversation history dan session
 - Setiap user punya session terpisah dengan conversation history
 - Auto-cleanup session yang tidak aktif > 1 jam
 - Tracking statistik per session
+- ChatGPT-style sidebar untuk navigasi antar session
 
 ### 2. **System Instruction sebagai Tutor**
 Bot dirancang sebagai tutor yang:
@@ -16,28 +17,33 @@ Bot dirancang sebagai tutor yang:
 - Step-by-step explanation
 - Bahasa Indonesia yang santai & edukatif
 - Positif dan memotivasi
+- Mendukung semua mata pelajaran
 
-### 3. **Image Analysis**
-- Upload foto soal/diagram/grafik
-- Bot membantu memahami visual
-- Context tetap tersimpan dalam conversation
+### 3. **Modern UI/UX**
+- Dark theme dengan blue gradient accents
+- ChatGPT-style sidebar untuk session management
+- Custom notifications dengan Toastify & SweetAlert2
+- Responsive design untuk mobile & desktop
+- Smooth animations dan transitions
 
 ### 4. **Conversation History**
 - Semua percakapan tersimpan per session
 - Bot ingat konteks percakapan sebelumnya
 - Bisa ganti topik dalam session yang sama
+- Lihat history kapan saja lewat UI atau API
 
 ## 🚀 Quick Start
 
 ### 1. Install Dependencies
 ```bash
-npm install express @google/generative-ai dotenv multer
+npm install express @google/generative-ai dotenv cors
 ```
 
 ### 2. Setup Environment
 Buat file `.env`:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
+PORT=3000
 ```
 
 ### 3. Run Server
@@ -47,15 +53,26 @@ node index.js
 
 Server akan jalan di `http://localhost:3000`
 
+### 4. Akses Web Interface
+Buka browser: `http://localhost:3000`
+
+**Fitur UI:**
+- Sidebar kiri untuk session management
+- New Session, Stats, History, Clear chat
+- Switch antar session dengan smooth transition
+- Delete session langsung dari sidebar
+- Dark theme konsisten
+
 ## 📡 API Endpoints
 
 ### Basic Flow
 ```
 1. POST /session/new        → Dapat sessionId
-2. POST /chat               → Mulai belajar
-3. POST /chat/image         → Upload soal foto (optional)
-4. GET /session/:id         → Lihat history
-5. DELETE /session/:id      → Hapus session
+2. POST /api/chat           → Mulai belajar (text-only)
+3. GET /session/:id         → Lihat history
+4. GET /session/:id/stats   → Lihat statistik
+5. GET /sessions            → List semua session
+6. DELETE /session/:id      → Hapus session
 ```
 
 ### Detail Endpoints
@@ -73,10 +90,9 @@ POST /session/new
   "expiresIn": "1 jam sejak aktivitas terakhir"
 }
 ```
-
-#### 2. Chat
+ (Text-Only)
 ```http
-POST /chat
+POST /api/chat
 Content-Type: application/json
 
 {
@@ -94,27 +110,28 @@ Content-Type: application/json
 }
 ```
 
-#### 3. Chat with Image
+**Alternative (Backward Compatible):**
 ```http
-POST /chat/image
-Content-Type: multipart/form-data
+POST /api/chat
+Content-Type: application/json
 
-sessionId: uuid-here
-image: [file]
-question: "Tolong jelaskan cara menyelesaikan soal ini"
-```
-**Response:**
-```json
 {
-  "success": true,
-  "sessionId": "uuid-here",
-  "message": "Oke saya lihat soalnya... [analisis gambar]",
-  "messageCount": 2,
+  "conversation": [
+    { "role": "user", "parts": [{ "text": "Jelaskan fotosintesis" }] }
+  ]
   "imageAnalyzed": true
 }
 ```
 
 #### 4. Get History
+```http
+GET /session/:sessionId
+```
+**Response:**
+```json
+{
+  "success": true,
+  "se3. Get History
 ```http
 GET /session/:sessionId
 ```
@@ -141,27 +158,48 @@ GET /session/:sessionId
 }
 ```
 
-#### 5. Get Session Stats
+#### 4. Get Session Stats
 ```http
 GET /session/:sessionId/stats
 ```
+**Response:**
+```json
+{
+  "success": true,
+  "sessionId": "uuid-here",
+  "stats": {
+    "messageCount": 5,
+    "duration": "15 menit",
+    "createdAt": "2026-01-29T10:00:00",
+    "lastActivity": "2026-01-29T10:15:00"
+  }
+}
 
-#### 6. List All Sessions
-```http
-GET /sessions
-```
+### Via Web Interface (Recommended)
+1. Jalankan server: `node index.js`
+2. Buka browser: `http://localhost:3000`
+3. Klik "New Session" untuk memulai
+4. Ketik pertanyaan di input box
+5. Gunakan sidebar untuk switch antar session
+6. Test fitur Stats, History, Clear, Delete
 
-#### 7. Delete Session
-```http
-DELETE /session/:sessionId
-```
-
-## 🧪 Testing dengan Postman
-
+### Via Postman
 1. **Import Collection:**
    - Buka Postman
    - Import `Education_Bot.postman_collection.json`
 
+2. **Run Sequential:**
+   - Test 1: Create Session (sessionId otomatis tersimpan)
+   - Test 2-4: Chat berbagai topik (text-only)
+   - Test 5-6: Lihat history & stats
+   - Test 7-8: List sessions & delete session
+   - Test 9: E
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Session berhasil dihapus"
+}
 2. **Run Sequential:**
    - Test 1: Create Session (sessionId otomatis tersimpan)
    - Test 2-4: Chat berbagai topik (lihat conversation history)
@@ -212,19 +250,45 @@ Bot: "Oke, ganti ke Biologi ya! 🌱 Fotosintesis itu proses tumbuhan 'masak mak
 |-------|---------------------|------------------------------|
 | **Session** | ❌ Tidak ada | ✅ Per-user session dengan UUID |
 | **History** | ❌ Setiap request baru | ✅ Conversation tersimpan |
-| **System Instruction** | ❌ Generic | ✅ Tutor edukatif dengan metode Socratic |
-| **Image** | ✅ Ada tapi terpisah | ✅ Terintegrasi dalam conversation |
-| **Error Handling** | ⚠️ Basic | ✅ Comprehensive dengan validation |
-| **Response Format** | ⚠️ Tidak konsisten | ✅ Konsisten (success, error fields) |
-| **Endpoints** | 5 endpoint media | 8 endpoint dengan management |
-| **Cleanup** | ❌ Tidak ada | ✅ Auto-cleanup session lama |
-| **Documentation** | ❌ Minimal | ✅ API info di root endpoint |
+| *🎨 Tech Stack
 
-## 💡 Tips Penggunaan
+### Backend
+- **Node.js + Express.js** - Server framework
+- **Google Gemini AI** (gemini-2.0-flash-exp) - AI engine
+- **UUID** - Session ID generation
+- **CORS** - Cross-origin resource sharing
+- **dotenv** - Environment configuration
 
-1. **Untuk Development:**
-   - Gunakan 1 session untuk testing
-   - Cek `/sessions` untuk monitoring
+### Frontend
+- **Vanilla JavaScript** - No framework dependencies
+- **HTML5 + CSS3** - Semantic markup & modern styling
+- **Toastify.js** - Toast notifications (success/error/info)
+- **SweetAlert2** - Beautiful confirmation dialogs
+- **Dark Theme** - ChatGPT-inspired UI (#343541, #202123)
+- **Blue Gradients** - Brand color (#4facfe → #00f2fe)
+
+### Features
+- **Session Management** - UUID-based with auto-cleanup
+- **Conversation History** - Persistent per session
+- **Sidebar Navigation** - ChatGPT-style session list
+- **Responsive Design** - Mobile & desktop friendly
+- **Custom Notifications** - Toastify + SweetAlert2
+- **Smooth Animations** - CSS transitions & transforms
+
+## 📂 File Structure
+
+```
+FinalProjectMajuBarengAI/
+├── index.js                              # Backend server & AI logic
+├── package.json                          # Dependencies
+├── .env                                  # API keys (gitignored)
+├── Education_Bot.postman_collection.json # API testing
+├── README-education-bot.md               # Documentation
+└── public/                               # Frontend files
+    ├── index.html                        # Main UI structure
+    ├── script.js                         # Frontend logic
+    └── style.css                         # Dark theme styling
+```
    - History bisa dilihat kapan saja
 
 2. **Untuk Production:**
@@ -243,20 +307,89 @@ Bot: "Oke, ganti ke Biologi ya! 🌱 Fotosintesis itu proses tumbuhan 'masak mak
 
 Bot ini dirancang dengan prinsip:
 - **Tidak spoon-feeding:** Membimbing, bukan memberikan jawaban mentah
-- **Socratic method:** Bertanya balik untuk merangsang pemikiran
-- **Step-by-step:** Pecah masalah kompleks jadi langkah kecil
-- **Encouraging:** Positif dan memotivasi siswa
-- **Context-aware:** Ingat percakapan sebelumnya
+### Backend (index.js)
+Edit `SYSTEM_INSTRUCTION` untuk:
+- Ubah personality bot
+- Adjust teaching style (Socratic method)
+- Add specific subject focus
+- Change language (default: Bahasa Indonesia)
+- Adjust temperature (default: 0.7 untuk konsistensi)
 
+### Frontend (public/)
+**index.html:**
+- Ubah bot name dari "Tidars"
+- Tambah/kurangi action buttons
+- Modifikasi modal structure
+
+**script.js:**
+- Customize notification messages
+- Adjust toast duration & position
+- Modify SweetAlert2 styling
+- Add new features (export chat, search, dll)
+
+**style.css:**
+- Change color scheme (default: blue gradient)
+- Adjust sidebar width (default: 280px)
+- Modify dark theme colors
+- Update responsive breakpoints
 ## 📊 Monitoring
 
 Lihat active sessions:
 ```http
 GET /sessions
 ```
+## 🎯 Notification System
 
-Lihat detail session:
-```http
+### Toast Notifications (Toastify)
+- **Success** (Blue Gradient): Session created, deleted, switched
+- **Error** (Red Gradient): API errors, network issues
+- **Info** (Purple Gradient): Stats, history opened
+- **Duration**: 3 seconds with smooth fade
+- **Position**: Top-right corner
+
+### Confirmation Dialogs (SweetAlert2)
+- **Dark Theme**: Matches app theme (#343541)
+- **Custom Buttons**: Blue gradient confirm, gray cancel
+- **Use Cases**: New session, clear chat, delete session
+- **Keyboard Support**: Enter = confirm, Esc = cancel
+
+## 📱 Responsive Design
+
+### Desktop (>768px)
+- Sidebar visible, 280px width
+- Main container margin-left 280px
+- Full feature access
+
+### Mobile (≤768px)
+- Sidebar hidden by default (slide-in on toggle)
+- Main container full width
+- Touch-friendly buttons
+- Mobile-optimized inputs
+
+## 🚀 Future Improvements
+
+- [ ] Database integration (MongoDB/PostgreSQL)
+- [ ] User authentication & authorization
+- [ ] Export chat history (PDF/TXT)
+- [ ] Search functionality in history
+- [ ] Voice input/output
+- [ ] Multi-language support
+- [ ] Analytics dashboard
+- [ ] Rate limiting per user
+- [ ] Image upload re-implementation
+- [ ] Code syntax highlighting
+
+## 📝 Notes
+
+- **Text-Only**: Image upload fitur dihapus, fokus ke text chat
+- **Session Cleanup**: Auto-delete session tidak aktif >1 jam
+- **Temperature**: 0.7 untuk balance antara kreativitas & konsistensi
+- **Backward Compatible**: Support format conversation array legacy
+- **No Database**: Session stored in memory (restart = data hilang)
+
+---
+
+**Tidars Education Bot** - Learn smarter, not harder 🎓✨
 GET /session/:id
 GET /session/:id/stats
 ```
